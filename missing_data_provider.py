@@ -7,6 +7,11 @@ from torch.utils.data import Dataset
 from torch.distributions.beta import Beta
 
 
+__all__ = ['MissingDataProvider',
+           '_generate_patterns',
+           '_random_weights_for_patterns']
+
+
 class MissingDataProvider(Dataset):
     """
     Generates missing data in the given dataset.
