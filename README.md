@@ -1,4 +1,4 @@
-# Pytorch Data Provider for Procedurally Providing Random Artificially-Missing Data
+# Pytorch Data Provider for Generating Artificially-Missing Data
 
 ## Introduction
 
