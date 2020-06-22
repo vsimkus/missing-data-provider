@@ -148,8 +148,6 @@ def test_little_mnar_with_custom_patterns():
                                      cov=cov)
 
     p_value = 1 - ss.chi2.cdf(d2, df).item()
-    print(p_value)
-    # asd
     assert p_value < 0.05
 
 
@@ -195,7 +193,6 @@ def _little_MCAR_statistics(data, mask, mean=None, cov=None):
             Z = 0
         d2 += counts[j] * Z
         df += (~mask_j).sum()
-        print(d2)
 
     return d2, df
 

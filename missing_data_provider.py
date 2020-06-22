@@ -189,6 +189,10 @@ class MissingDataProvider(Dataset):
         if isinstance(data, tuple):
             # Get the data for which the missing masks are generated
             data = data[self.target_idx]
+
+        if isinstance(data, np.ndarray):
+            data = torch.tensor(data)
+
         return data
 
     def _validate_args(self):
