@@ -1,1 +1,1 @@
-import * from missing_data_provider
+from missing_data_provider import *
