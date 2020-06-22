@@ -1,0 +1,11 @@
+# Python
+*__pycache__/
+*.pyc
+*.egg-info
+
+# PyTest
+.pytest_cache/
+
+# VS Code
+.vscode/
+
