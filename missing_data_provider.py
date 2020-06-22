@@ -1,11 +1,11 @@
+import math
 from functools import reduce
 from typing import Union
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
 from torch.distributions.beta import Beta
-
+from torch.utils.data import Dataset
 
 __all__ = ['MissingDataProvider',
            '_generate_patterns',
@@ -18,7 +18,7 @@ class MissingDataProvider(Dataset):
     The missingness is denoted by adding additional tensor M,
     whose size is the same as X.
     Args:
-        dataset (torch.utils.data): Fully-observed PyTorch dataset
+        dataset (torch.utils.data.Dataset): Fully-observed PyTorch dataset
         target_idx (int): If the dataset returns tuples, then this should be the index
             of the target data in the tuple for which the missing mask is added.
         total_miss (float): Total fraction of values to be made missing
@@ -41,7 +41,7 @@ class MissingDataProvider(Dataset):
         rand_generator (torch.Generator): (optional) PyTorch random number generator.
     """
     def __init__(self,
-                 dataset: torch.Tensor,
+                 dataset: Dataset,
                  target_idx: int = 0,
                  total_miss: float = 0.00,
                  miss_type: str = 'MCAR',
@@ -250,18 +250,19 @@ class MissingDataProvider(Dataset):
         # Total number of incomplete samples for all patterns
         C = torch.sum(C)
 
-        assert C < data_shape[0],\
-            ('The calculated incomplete sample fraction is greater than the '
-             'number of samples. This means that the patterns and relative '
-             'frequencies are not compatible with the requested total '
-             'missingness fraction.')
+        # assert C < data_shape[0],\
+        #     ('The calculated incomplete sample fraction is greater than the '
+        #      'number of samples. This means that the patterns and relative '
+        #      'frequencies are not compatible with the requested total '
+        #      'missingness fraction.')
+        C = min(C.item(), data_shape[0])
 
         # The incomplete fraction of all data points
         return C / data_shape[0]
 
     def _split_comp_and_incomp_idxs(self, data, frac_incomp_samples):
         # The total number of incomplete data points
-        total_incomp = int(torch.floor(frac_incomp_samples * data.shape[0]))
+        total_incomp = int(math.floor(frac_incomp_samples * data.shape[0]))
 
         # Randomly split the data into incomplete and complete subsets
         all_idx = torch.randperm(data.shape[0], generator=self.rand_generator)
