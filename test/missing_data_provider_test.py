@@ -151,6 +151,79 @@ def test_little_mnar_with_custom_patterns():
     assert p_value < 0.05
 
 
+def test_ttest_mcar():
+    N, D = 10000, 20
+    total_miss = 0.6
+    A = torch.randn(D, D)
+    mean = torch.randn(D)
+    data = torch.randn(N, D) @ A + mean
+
+    dataset = torch.utils.data.TensorDataset(data)
+    data_provider = MissingDataProvider(dataset,
+                                        total_miss=total_miss,
+                                        miss_type='MCAR')
+
+    data, mask = data_provider[:]
+    pvalues = _pairwise_ttest(data, mask)
+
+    # Want at least 80% of the variables to be confirmed MCAR
+    # It can still fail on an occasion
+    assert (pvalues > 0.05).sum().item() / pvalues.numel() > 0.8
+
+
+def test_ttest_mnar():
+    N, D = 10000, 20
+    max_patterns = 50
+    total_miss = 0.6
+    A = torch.randn(D, D)
+    mean = torch.randn(D)
+    data = torch.randn(N, D) @ A + mean
+
+    dataset = torch.utils.data.TensorDataset(data)
+    data_provider = MissingDataProvider(dataset,
+                                        total_miss=total_miss,
+                                        max_patterns=max_patterns,
+                                        miss_type='MNAR',
+                                        should_fit_to_data=True)
+
+    data, mask = data_provider[:]
+    pvalues = _pairwise_ttest(data, mask)
+
+    # Want at least 40% of the variables to be confirmed not MCAR
+    # It can still fail on occasion
+    assert (pvalues < 0.05).sum().item() / pvalues.numel() > 0.4
+
+
+def _pairwise_ttest(data, mask):
+    # TODO: make a utility
+    dims = list(range(data.shape[-1]))
+
+    data = data.clone()
+    data[~mask] = float('nan')
+
+    pvalue_matrix = torch.zeros(data.shape[-1]-1,
+                                data.shape[-1],
+                                dtype=torch.float)
+
+    for i, j in product(dims, dims):
+        # i - the variable we split into observed and missing parts
+        # j - the variable we use to perform pairwise ttest between the
+        # two parts of i
+
+        # Don't do it for the same dims
+        if i == j:
+            continue
+        data_ij = data[:, [i, j]]
+        mask_ij = mask[:, [i, j]]
+        obs_part = data_ij[mask_ij[:, 0] & mask_ij[:, 1], 1]
+        mis_part = data_ij[~mask_ij[:, 0] & mask_ij[:, 1], 1]
+
+        pvalue = ss.ttest_ind(mis_part, obs_part, equal_var=False).pvalue
+        pvalue_matrix[i-1, j] = pvalue
+
+    return pvalue_matrix
+
+
 def _little_MCAR_statistics(data, mask, mean=None, cov=None):
     # TODO: make a utility
     if mean is None and cov is None:
