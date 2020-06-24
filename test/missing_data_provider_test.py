@@ -277,11 +277,12 @@ def _fit_multivariate_Gaussian_from_incomplete_data(data, mask, max_iter=100, et
 
     assert data.shape == mask.shape
     data = data.clone()
+    data[mask_not] = 0.
 
     # Initialise parameters - mean and covariance
-    mean = torch.zeros((data.shape[-1], ), dtype=torch.float)
+    mean = torch.randn((data.shape[-1], ), dtype=data.dtype)
     # Generate random pos-definite covariance matrix
-    cov = torch.randn((data.shape[-1], data.shape[-1]), dtype=torch.float)
+    cov = torch.randn((data.shape[-1], data.shape[-1]), dtype=data.dtype)
     cov = cov @ cov.T
 
     for j in range(max_iter):

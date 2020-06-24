@@ -102,6 +102,7 @@ class MissingDataProvider(Dataset):
             self.weights = _random_weights_for_patterns(
                                         self.patterns,
                                         miss_mech=self.miss_type,
+                                        dtype=data.dtype,
                                         rand_generator=self.rand_generator)
 
         # Convert total % of missing values to % of incomplete samples
@@ -277,6 +278,8 @@ class MissingDataProvider(Dataset):
                                  generator=self.rand_generator).squeeze()
 
 
+# TODO: note that this can run into an infinite loop with poor choice of arguments
+# TODO: add a check
 def _generate_patterns(max_patterns, D, total_miss, rand_generator=None):
     """
     Generate missingness patterns as binary masks. 1 is observed and 0 is missing.
@@ -289,17 +292,30 @@ def _generate_patterns(max_patterns, D, total_miss, rand_generator=None):
     """
     rand_generator = (rand_generator if rand_generator is not None
                       else torch.Generator())
-
+    rand_generator.seed()
     # Create an array with the desired fraction of missing values
     total_vals = max_patterns*D
     miss_vals = int(total_vals*total_miss)
-    patterns = torch.ones((total_vals, ), dtype=torch.bool)
-    patterns[:miss_vals] = 0.
 
-    # Shuffle the array and reshape to the desired pattern shape
-    rand_idx = torch.randperm(total_vals, generator=rand_generator)
-    patterns = patterns[rand_idx]
-    patterns = patterns.reshape(max_patterns, D)
+    def gen_patterns():
+        patterns = torch.ones((total_vals, ), dtype=torch.bool)
+        patterns[:miss_vals] = 0.
+
+        # Shuffle the array and reshape to the desired pattern shape
+        rand_idx = torch.randperm(total_vals, generator=rand_generator)
+        patterns = patterns[rand_idx]
+        patterns = patterns.reshape(max_patterns, D)
+
+        return patterns
+
+    patterns = gen_patterns()
+
+    # NOTE: this may never finish if there is no solution so
+    # an assertion is needed
+    # We want to prevent fully-patterns (all ones), so generate until
+    # we get one.
+    while torch.any(torch.all(patterns, dim=-1)).item():
+        patterns = gen_patterns()
 
     # Only return unique patterns and get their relative frequency
     # TODO: maybe not unique?
@@ -307,41 +323,24 @@ def _generate_patterns(max_patterns, D, total_miss, rand_generator=None):
     rel_freqs = rel_freqs.float()
     rel_freqs = rel_freqs / rel_freqs.sum()
 
-    # If there is a full-observed mask, we want to remove it
-    fully_observed = torch.all(patterns, dim=-1)
-    if torch.any(fully_observed):
-        full_rel_freqs = rel_freqs[fully_observed]
-
-        not_fully_observed = ~fully_observed
-        rel_freqs = rel_freqs[not_fully_observed]
-        patterns = patterns[not_fully_observed]
-        num_pattern_ones = patterns.sum(dim=1)
-
-        # Redistribute the ones by changing the relative freqs of the
-        # incomplete patterns
-        delta = full_rel_freqs.sum()*D/patterns.shape[0]
-        rel_freqs += delta
-        rel_freqs /= num_pattern_ones
-
-        # Renormalise the freqs
-        rel_freqs = rel_freqs / rel_freqs.sum()
-
     return patterns, rel_freqs
 
 
-def _random_weights_for_patterns(patterns, miss_mech, rand_generator=None):
+def _random_weights_for_patterns(patterns, miss_mech,
+                                 dtype=torch.float, rand_generator=None):
     """
     Generate a random weight matrix for each pattern. Weight values in [-1, 1)
     Args:
         patterns (torch.Tensor): Patterns for which to generate random weights
         miss_mech (str): MNAR (zeros where patterns==1) or MAR (zeros where patterns==0)
+        dtype (torch.dtype): Data type of the weights
         rand_generator (torch.Generator): (optional) PyTorch random number generator.
     """
     rand_generator = (rand_generator if rand_generator is not None
                       else torch.Generator())
 
     # Generate random weights in [-1, 1)
-    weights = torch.rand(*(patterns.shape))*2-1
+    weights = torch.rand(*(patterns.shape), dtype=dtype)*2-1
 
     if miss_mech in ('MNAR', 'NMAR'):
         # Make sure the patterns depend on missing variables only
