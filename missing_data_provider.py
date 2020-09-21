@@ -200,7 +200,7 @@ class MissingDataProvider(Dataset):
         assert self.miss_type in ('patterns', 'MCAR', 'MAR', 'MNAR', 'NMAR'),\
             f'Invalid missingness mechanism type: {self.miss_type}!'
 
-        assert 0 < self.total_miss <= 1,\
+        assert 0 <= self.total_miss <= 1,\
             f'Invalid total missingness: {self.total_miss:.2f}!'
 
         if self.miss_type == 'patterns':
